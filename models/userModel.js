@@ -1,43 +1,93 @@
-import pool from "../config/db.js";
+import prisma from '../config/prisma.js';
 
-export const createUser = async (
-  name,
-  email,
-  password,
-  role,
-  address,
-  location
-) => {
+/* =======================================================
+   🔹 CREATE USER
+======================================================= */
+export const createUser = async (name, email, password, role, address, location, phone) => {
   try {
-    console.log("Creating user with data:", {
-      name,
-      email,
-      role,
-      address,
-      location: JSON.stringify(location),
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password,
+        role: role.toLowerCase(),
+        address: address || '',
+        location: location || { lat: 0, lng: 0 },
+        // phone field doesn't exist in existing schema, so we skip it
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        address: true,
+        createdAt: true,
+      },
     });
-    const result = await pool.query(
-      "INSERT INTO users (name, email, password, role, address, location) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [name, email, password, role, address, JSON.stringify(location)]
-    );
-    console.log("User created:", result.rows[0]);
-    return result.rows[0];
+    return user;
   } catch (error) {
-    console.error("Database error:", error);
+    console.error('❌ Error creating user:', error.message);
     throw error;
   }
 };
 
+/* =======================================================
+   🔹 FIND USER BY EMAIL
+======================================================= */
 export const findUserByEmail = async (email) => {
-  const result = await pool.query("SELECT * FROM users WHERE email = $1", [
-    email,
-  ]);
-  return result.rows[0];
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+    return user;
+  } catch (error) {
+    console.error('❌ Error finding user by email:', error.message);
+    throw error;
+  }
 };
 
+/* =======================================================
+   🔹 FIND USER BY ID
+======================================================= */
+export const findUserById = async (id) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        address: true,
+        createdAt: true,
+      },
+    });
+    return user;
+  } catch (error) {
+    console.error('❌ Error finding user by id:', error.message);
+    throw error;
+  }
+};
+
+/* =======================================================
+   🔹 GET ALL USERS (ADMIN)
+======================================================= */
 export const getAllUsers = async () => {
-  const result = await pool.query(
-    "SELECT * FROM users ORDER BY created_at DESC"
-  );
-  return result.rows;
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        address: true,
+        createdAt: true,
+      },
+    });
+    return users;
+  } catch (error) {
+    console.error('❌ Error fetching users:', error.message);
+    throw error;
+  }
 };

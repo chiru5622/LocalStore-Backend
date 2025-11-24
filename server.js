@@ -2,48 +2,68 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
+import productRoutes from "./routes/productRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
 import pool from "./config/db.js";
 
 dotenv.config();
 
 const app = express();
 
-// CORS configuration - Updated for Vercel deployment
+// Allowed Origins
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5174",
-  process.env.FRONTEND_URL, // Add your Vercel frontend URL
+  process.env.FRONTEND_URL,
 ];
 
+/* -------------------------------------------------------
+   CORS CONFIG (PATCH + SAFE FOR EXPRESS v5)
+-------------------------------------------------------*/
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
-      // Allow localhost for development
-      if (allowedOrigins.indexOf(origin) !== -1) {
+
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      
-      // Allow all Vercel deployments (*.vercel.app)
-      if (origin && origin.endsWith('.vercel.app')) {
+
+      if (origin.endsWith(".vercel.app")) {
         return callback(null, true);
       }
-      
-      callback(new Error('Not allowed by CORS'));
+
+      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
+/* -------------------------------------------------------
+   UNIVERSAL OPTIONS HANDLER — EXPRESS v5 SAFE
+-------------------------------------------------------*/
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
 
-// Basic route
+/* -------------------------------------------------------
+   ROUTES
+-------------------------------------------------------*/
 app.get("/", (req, res) => {
   res.json({
     message: "Server is running!",
@@ -52,10 +72,13 @@ app.get("/", (req, res) => {
   });
 });
 
-// Routes
 app.use("/auth", authRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/orders", orderRoutes);
 
-// Global error handling middleware
+/* -------------------------------------------------------
+   GLOBAL ERROR HANDLER
+-------------------------------------------------------*/
 app.use((err, req, res, next) => {
   console.error("❌ Error details:", {
     message: err.message,
@@ -71,15 +94,11 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-
-// For Vercel serverless functions, we export the app
-// For local development, we start the server
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log("👉 CORS enabled for:", allowedOrigins);
+    console.log("👉 CORS allowed for:", allowedOrigins);
   });
 }
 
-// Export for Vercel
 export default app;

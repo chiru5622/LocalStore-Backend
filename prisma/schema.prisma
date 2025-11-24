@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Existing User model - DO NOT MODIFY
+model User {
+  id                                      Int           @id @default(autoincrement())
+  name                                    String        @db.VarChar(100)
+  email                                   String        @unique @db.VarChar(100)
+  password                                String        @db.VarChar(255)
+  role                                    String?       @default("customer") @db.VarChar(50)
+  address                                 String?
+  latitude                                Decimal?      @db.Decimal(9, 6)
+  longitude                               Decimal?      @db.Decimal(9, 6)
+  createdAt                               DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
+  location                                Json?
+  restaurants_restaurants_owner_idTousers restaurants[] @relation("restaurants_owner_idTousers")
+  restaurants_restaurants_user_idTousers  restaurants[] @relation("restaurants_user_idTousers")
+
+  // New relations for store management
+  ordersAsCustomer Order[] @relation("CustomerOrders")
+  ordersAsDelivery Order[] @relation("DeliveryOrders")
+
+  @@map("users")
+}
+
+// Existing restaurants model - IGNORE (do not modify)
+model restaurants {
+  id                                Int       @id @default(autoincrement())
+  name                              String    @db.VarChar(100)
+  image                             String?
+  location                          String?
+  rating                            Decimal?  @default(0.0) @db.Decimal(2, 1)
+  owner_id                          Int?
+  created_at                        DateTime? @default(now()) @db.Timestamp(6)
+  user_id                           Int?
+  menu                              Json?
+  users_restaurants_owner_idTousers User?     @relation("restaurants_owner_idTousers", fields: [owner_id], references: [id], onUpdate: NoAction)
+  users_restaurants_user_idTousers  User?     @relation("restaurants_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// NEW: Product model for store management
+model Product {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?  @default("")
+  image             String
+  category          String
+  price             Float
+  stock             Int      @default(0)
+  lowStockThreshold Int      @default(10) @map("low_stock_threshold")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+// NEW: Order model for store management
+model Order {
+  id               String   @id @default(cuid())
+  orderNumber      String   @unique @default(cuid()) @map("order_number")
+  customerId       Int      @map("customer_id")
+  deliveryAddress  String?  @map("delivery_address")
+  status           String   @default("PENDING") // PENDING, CONFIRMED, PREPARING, READY, OUT_FOR_DELIVERY, DELIVERED, REJECTED
+  total            Float
+  assignedDeliveryId Int?   @map("assigned_delivery_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  customer         User     @relation("CustomerOrders", fields: [customerId], references: [id])
+  deliveryPartner  User?    @relation("DeliveryOrders", fields: [assignedDeliveryId], references: [id])
+  items            OrderItem[]
+
+  @@map("orders")
+}
+
+// NEW: OrderItem model for store management
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String  @map("order_id")
+  productId String  @map("product_id")
+  quantity  Int
+  price     Float   // Price at time of order
+
+  // Relations
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
